@@ -4,7 +4,7 @@ Notarize a macOS app from the command line.
 
 ## Details
 
-This tool is a wrapper for `xcrun altool` and `xcrun stapler` and is intended for use in a continuous integration (CI) environment. Requires Xcode.
+This tool is a wrapper for `xcrun notarytool` and `xcrun stapler` and is intended for use in a continuous integration (CI) environment. Requires Xcode.
 
 Supports notarizing app packages, disk images, and zip files.
 
@@ -12,8 +12,8 @@ Supports notarizing app packages, disk images, and zip files.
 
 ```sh
 npx notarize-cli --file build/$PRODUCT_MODULE_NAME.dmg \
-                 --bundle-id $PRODUCT_BUNDLE_IDENTIFIER \
-                 --username $NOTARIZE_USERNAME \
+                 --apple-id $NOTARIZE_APPLE_ID \
+                 --team-id $NOTARIZE_TEAM_ID \
                  --password $NOTARIZE_PASSWORD
 ```
 
@@ -29,12 +29,11 @@ USAGE
 OPTIONS
   -h, --help                   show CLI help
   -v, --version                show CLI version
-  --asc-provider=asc-provider  asc provider to use for app notarization
-  --bundle-id=bundle-id        (required) bundle id of the app to notarize
   --file=file                  (required) path to the file to notarize
   --no-staple                  disable automatic stapling
   --password=password          (required) password to use for authentication
-  --username=username          (required) username to use for authentication
+  --apple-id=apple-id          (required) Apple ID to use for authentication
+  --team-id=team-id            (required) Team ID to use for authentication
 ```
 
 ## Environment variables
@@ -42,7 +41,8 @@ OPTIONS
 Some options may be passed as environment variables.
 
 - `NOTARIZE_PASSWORD`: password to use for authentication
-- `NOTARIZE_USERNAME`: username to use for authentication
+- `NOTARIZE_APPLE_ID`: Apple ID to use for authentication
+- `NOTARIZE_TEAM_ID`: Team ID to use for authentication
 - `PRODUCT_BUNDLE_IDENTIFIER`: bundle id of the app to notarize
 
 ## Installation
@@ -55,6 +55,5 @@ npm install -g notarize-cli
 
 ## Implementation details
 
-1. Runs `xcrun altool --notarize-app`.
-1. Runs `xcrun altool --notarization-info` in a loop until the notarization status changes.
-1. Runs `xcrun stapler staple` if notarization is successful.
+1. Runs `xcrun notarytool submit --wait`.
+2. Runs `xcrun stapler staple` if notarization is successful.

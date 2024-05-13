@@ -1,18 +1,18 @@
 const execa = require('execa');
 
-const sleep = async (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const getNotarizationInfo = async (requestUuid, username, password) => {
+const getNotarizationInfo = async (requestUuid, appleId, teamId, password) => {
   const { stdout } = await execa('xcrun', [
-    'altool',
-    '--notarization-info',
-    requestUuid,
-    '--username',
-    username,
+    'notarytool',
+    'log',
+    '--apple-id',
+    appleId,
+    '--team-id',
+    teamId,
     '--password',
     password,
     '--output-format',
     'json',
+    requestUuid,
   ]);
   let notarizationInfo;
   try {
@@ -23,43 +23,37 @@ const getNotarizationInfo = async (requestUuid, username, password) => {
   return notarizationInfo;
 };
 
-const getRequestStatus = async (requestUuid, username, password) => {
-  const info = await getNotarizationInfo(requestUuid, username, password);
-  return info ? info.Status : 'unknown';
-};
-
-const notarizeApp = async (file, bundleId, provider, username, password) => {
+const notarizeApp = async (file, appleId, teamId, password) => {
   let failed;
-  var xcrun_args = ['altool', '--notarize-app'];
-  if (file !== undefined) {
-    xcrun_args.push('--file', file);
+  var xcrun_args = ['notarytool', 'submit'];
+  xcrun_args.push('--wait');
+  xcrun_args.push('--output-format', 'json');
+  if (appleId !== undefined) {
+    xcrun_args.push('--apple-id', appleId);
   }
-  if (bundleId !== undefined) {
-    xcrun_args.push('--primary-bundle-id', bundleId);
-  }
-  if (provider !== undefined) {
-    xcrun_args.push('--asc-provider', provider);
-  }
-  if (username !== undefined) {
-    xcrun_args.push('--username', username);
+  if (teamId !== undefined) {
+    xcrun_args.push('--team-id', teamId);
   }
   if (password !== undefined) {
     xcrun_args.push('--password', password);
   }
-  xcrun_args.push('--output-format', 'json');
+  if (file !== undefined) {
+    xcrun_args.push(file);
+  }
   const { stdout } = await execa('xcrun', xcrun_args).catch((e) => { failed = true; return e });
-  let requestUuid, error;
+  let requestUuid, requestStatus, error;
   try {
     if (failed) {
-      error = JSON.parse(stdout)['product-errors'][0].message
+      error = JSON.parse(stdout)['message'];
     }
     else {
-      requestUuid = JSON.parse(stdout)['notarization-upload'].RequestUUID;
+      requestUuid = JSON.parse(stdout)['id'];
+      requestStatus = JSON.parse(stdout)['status'];
     }
   } catch (error) {
     console.error(stdout);
   }
-  return { requestUuid, error };
+  return { requestUuid, requestStatus, error };
 };
 
 const staple = async (file) => {
@@ -68,9 +62,7 @@ const staple = async (file) => {
 };
 
 module.exports = {
-  sleep,
   getNotarizationInfo,
-  getRequestStatus,
   notarizeApp,
   staple,
 };

@@ -1,9 +1,7 @@
 const { Command, flags } = require('@oclif/command');
 
 const {
-  sleep,
   getNotarizationInfo,
-  getRequestStatus,
   notarizeApp,
   staple,
 } = require('./util');
@@ -13,59 +11,35 @@ class NotarizeCliCommand extends Command {
     // eslint-disable-next-line no-shadow
     const { flags } = this.parse(NotarizeCliCommand);
     process.stdout.write('Uploading file... ');
-    const { requestUuid, error } = await notarizeApp(
+    const { requestStatus, requestUuid } = await notarizeApp(
       flags.file,
-      flags['bundle-id'],
-      flags['asc-provider'],
-      flags.username,
+      flags['apple-id'],
+      flags['team-id'],
       flags.password,
     );
-    if (!requestUuid) {
-        console.log('failed');
-        console.error('Error:', error ?? 'could not upload file for notarization');
-        this.exit(1);
-      } else {
-      console.log('done');
-      let requestStatus = 'in progress';
 
-      console.log(`Request UUID is ${requestUuid}`);
+    if (requestStatus === 'Accepted' && !flags['no-staple']) {
+      await staple(flags.file);
+    }
 
-      // Sometimes Apple receives the upload and issues a UUID, but is not ready to return request status right away
-      // Allow up to 5 retries on error before giving up and calling this an actual failure
-      let retries = 0;
+    const notarizationInfo = await getNotarizationInfo(
+      requestUuid,
+      flags['apple-id'],
+      flags['team-id'],
+      flags.password,
+    ).catch(() => undefined);
+    // eslint-disable-next-line no-unused-expressions
+    if (notarizationInfo) {
+      const fs = require('fs');
+      const timestamp = new Date().toISOString();
+      fs.writeFileSync(`${timestamp}-notarization-log.json`, JSON.stringify(notarizationInfo, null, 2));
+    } else {
+      console.error('Error: could not get notarization info');
+    }
 
-      while (requestStatus === 'in progress') {
-        process.stdout.write('Waiting for notarization status... ');
-        await sleep(10 * 1000);
-        requestStatus = await getRequestStatus(
-          requestUuid,
-          flags.username,
-          flags.password,
-        ).catch(() => 'error');
-
-        console.log(requestStatus);
-
-        if (requestStatus === 'error' && retries <= 5) {
-          retries += 1;
-          requestStatus = 'in progress';
-        }
-      }
-      if (requestStatus === 'success' && !flags['no-staple']) {
-        staple(flags.file);
-      }
-      const notarizationInfo = await getNotarizationInfo(
-        requestUuid,
-        flags.username,
-        flags.password,
-      ).catch(() => undefined);
-      // eslint-disable-next-line no-unused-expressions
-      notarizationInfo
-        ? console.log(notarizationInfo)
-        : console.error('Error: could not get notarization info');
-      if (requestStatus !== 'success') {
-        console.error(`Error: could not notarize file`);
-        this.exit(1);
-      }
+    if (requestStatus !== 'Accepted') {
+      console.error(`Error: could not notarize file`);
+      this.exit(1);
     }
   }
 }
@@ -78,19 +52,15 @@ NotarizeCliCommand.flags = {
     description: 'path to the file to notarize',
     required: true,
   }),
-  'bundle-id': flags.string({
-    description: 'bundle id of the app to notarize',
+  'apple-id': flags.string({
+    description: 'Apple ID to use for authentication',
     required: true,
-    env: 'PRODUCT_BUNDLE_IDENTIFIER',
+    env: 'NOTARIZE_APPLE_ID',
   }),
-  'asc-provider': flags.string({
-    description: 'asc provider to use for app notarization',
-    required: false,
-  }),
-  username: flags.string({
-    description: 'username to use for authentication',
+  'team-id': flags.string({
+    description: 'Team ID to use for authentication',
     required: true,
-    env: 'NOTARIZE_USERNAME',
+    env: 'NOTARIZE_TEAM_ID',
   }),
   password: flags.string({
     description: 'password to use for authentication',
