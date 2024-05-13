@@ -16,7 +16,7 @@ const getNotarizationInfo = async (requestUuid, appleId, teamId, password) => {
   ]);
   let notarizationInfo;
   try {
-    notarizationInfo = JSON.parse(stdout)['notarization-info'];
+    notarizationInfo = JSON.parse(stdout);
   } catch (error) {
     console.error(stdout);
   }
